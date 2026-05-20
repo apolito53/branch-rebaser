@@ -31,6 +31,7 @@ class TuiTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 self.assertNotIsInstance(app.screen, PrimaryBranchModal)
                 self.assertEqual(app.primary, "main")
+                self.assertGreaterEqual(app.query_one("#actions").region.height, 3)
 
                 await pilot.press("m")
                 await pilot.pause()

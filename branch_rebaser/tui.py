@@ -119,9 +119,13 @@ class BranchRebaserApp(App):
     }
 
     #top {
-        height: 7;
+        height: 9;
         padding: 1 2;
         border: solid $primary;
+    }
+
+    #actions {
+        height: 3;
     }
 
     #content {
@@ -172,7 +176,7 @@ class BranchRebaserApp(App):
         yield Header()
         with Vertical(id="top"):
             yield Static("Loading repository...", id="status")
-            with Horizontal():
+            with Horizontal(id="actions"):
                 yield Button("Primary menu", id="menu", variant="default")
                 yield Button("Refresh", id="refresh", variant="default")
                 yield Button("Select recommended", id="select-recommended", variant="default")
