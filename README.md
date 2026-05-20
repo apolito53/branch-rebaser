@@ -21,6 +21,8 @@ Using the launcher script:
 ./branch-rebaser.sh --repo /path/to/repo
 ```
 
+The launcher checks for `rich` and `textual`. If they are missing, it installs the project and dependencies with `pip` before starting the TUI.
+
 From inside the repo you want to work on:
 
 ```bash
