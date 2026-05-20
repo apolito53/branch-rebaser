@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "branch-rebaser"
+version = "0.1.0"
+description = "Textual TUI for safely rebasing multiple git branches onto a selected primary branch."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "rich",
+    "textual",
+]
+
+[project.scripts]
+branch-rebaser = "branch_rebaser.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["branch_rebaser*"]
+
