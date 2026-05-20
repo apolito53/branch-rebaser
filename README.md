@@ -15,6 +15,20 @@ A conservative TUI for rebasing multiple local git branches onto a selected prim
 
 ## Run
 
+Using the launcher script:
+
+```bash
+./branch-rebaser.sh --repo /path/to/repo
+```
+
+From inside the repo you want to work on:
+
+```bash
+/path/to/branch-rebaser/branch-rebaser.sh
+```
+
+Using Python directly:
+
 ```bash
 python3 -m branch_rebaser --repo /path/to/repo
 ```
