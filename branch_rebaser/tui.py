@@ -210,7 +210,13 @@ class BranchRebaserApp(App):
         table = self.query_one("#branch-table", DataTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
-        table.add_columns("Sel", "Branch", "Behind", "Ahead", "Upstream", "Status", "Last commit")
+        table.add_column("Sel", width=3)
+        table.add_column("Branch")
+        table.add_column("Behind", width=6)
+        table.add_column("Ahead", width=5)
+        table.add_column("Upstream")
+        table.add_column("Status", width=14)
+        table.add_column("Last commit", width=16)
         self.refresh_analysis()
         self.call_after_refresh(self.open_primary_picker, True)
 
@@ -380,17 +386,17 @@ class BranchRebaserApp(App):
         if not self.analysis:
             return
         for branch in self.analysis.branches:
-            selected = "[x]" if branch.name in self.selected else "[ ]"
+            selected = Text("[x]" if branch.name in self.selected else "[ ]", no_wrap=True)
             status = self.status_text(branch)
-            branch_name = Text(branch.name)
+            branch_name = Text(branch.name, no_wrap=True, overflow="ellipsis")
             table.add_row(
                 selected,
                 branch_name,
-                str(branch.behind_primary),
-                str(branch.ahead_primary),
-                branch.upstream or "-",
+                Text(str(branch.behind_primary), no_wrap=True),
+                Text(str(branch.ahead_primary), no_wrap=True),
+                Text(branch.upstream or "-", no_wrap=True, overflow="ellipsis"),
                 status,
-                branch.last_commit,
+                Text(branch.last_commit, no_wrap=True, overflow="ellipsis"),
                 key=branch.name,
             )
 
@@ -399,14 +405,14 @@ class BranchRebaserApp(App):
 
     def status_text(self, branch: BranchInfo) -> Text:
         if branch.status == "needs rebase":
-            return Text(branch.status, style="bold yellow")
+            return Text(branch.status, style="bold yellow", no_wrap=True)
         if branch.status == "up to date":
-            return Text(branch.status, style="green")
+            return Text(branch.status, style="green", no_wrap=True)
         if branch.status in {"primary", "current"}:
-            return Text(branch.status, style="cyan")
+            return Text(branch.status, style="cyan", no_wrap=True)
         if branch.status == "already merged":
-            return Text(branch.status, style="dim")
-        return Text(branch.status, style="magenta")
+            return Text(branch.status, style="dim", no_wrap=True)
+        return Text(branch.status, style="magenta", no_wrap=True)
 
     def finish_run(self, result: RebasePlanResult) -> None:
         counts: Dict[str, int] = {}

@@ -21,6 +21,12 @@ class TuiTests(unittest.IsolatedAsyncioTestCase):
             (repo / "app.txt").write_text("base\n")
             self.git(repo, "add", "app.txt")
             self.git(repo, "commit", "-m", "base")
+            long_branch = "feature/very-long-branch-name-that-should-not-wrap"
+            self.git(repo, "checkout", "-b", long_branch)
+            (repo / "feature.txt").write_text("feature\n")
+            self.git(repo, "add", "feature.txt")
+            self.git(repo, "commit", "-m", "feature")
+            self.git(repo, "checkout", "main")
 
             app = BranchRebaserApp(repo)
             async with app.run_test(size=(120, 40)) as pilot:
@@ -33,8 +39,13 @@ class TuiTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(app.primary, "main")
                 self.assertGreaterEqual(app.query_one("#actions").region.height, 3)
                 main_row = app.query_one("#branch-table").get_row("main")
-                self.assertEqual(main_row[0], "[ ]")
+                self.assertEqual(str(main_row[0]), "[ ]")
                 self.assertEqual(str(main_row[1]), "main")
+                long_row = app.query_one("#branch-table").get_row(long_branch)
+                self.assertEqual(str(long_row[0]), "[ ]")
+                self.assertTrue(long_row[0].no_wrap)
+                self.assertTrue(long_row[1].no_wrap)
+                self.assertEqual(app.query_one("#branch-table").get_row_height(long_branch), 1)
 
                 await pilot.press("m")
                 await pilot.pause()
