@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Header, RichLog, Select, Static
 
 from .git_ops import (
@@ -19,14 +20,106 @@ from .git_ops import (
 )
 
 
+class PrimaryBranchModal(ModalScreen):
+    BINDINGS = [
+        ("enter", "confirm", "Use"),
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(
+        self,
+        candidates: List[str],
+        current_primary: str,
+        repo: Path,
+        current_branch: str,
+        *,
+        startup: bool = False,
+    ):
+        super().__init__()
+        self.candidates = candidates
+        self.current_primary = current_primary
+        self.repo = repo
+        self.current_branch = current_branch
+        self.startup = startup
+
+    def compose(self) -> ComposeResult:
+        title = "Choose Primary Branch" if self.startup else "Primary Branch"
+        cancel_label = "Quit" if self.startup else "Cancel"
+        with Vertical(id="primary-modal"):
+            yield Static(title, id="primary-modal-title")
+            yield Static(
+                f"Repo: {self.repo} | current: {self.current_branch}",
+                id="primary-modal-context",
+            )
+            yield Select(
+                [(candidate, candidate) for candidate in self.candidates],
+                prompt="Primary branch",
+                allow_blank=False,
+                value=self.current_primary,
+                id="primary-picker",
+            )
+            yield Static("", id="primary-modal-error")
+            with Horizontal(id="primary-modal-buttons"):
+                yield Button("Use primary", id="primary-confirm", variant="primary")
+                yield Button(cancel_label, id="primary-cancel", variant="default")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "primary-confirm":
+            self.action_confirm()
+        elif event.button.id == "primary-cancel":
+            self.action_cancel()
+
+    def action_confirm(self) -> None:
+        select = self.query_one("#primary-picker", Select)
+        value = select.value
+        if value == Select.BLANK:
+            self.query_one("#primary-modal-error", Static).update("Pick a primary branch.")
+            return
+        self.dismiss(str(value))
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class BranchRebaserApp(App):
     CSS = """
     Screen {
         layout: vertical;
     }
 
+    PrimaryBranchModal {
+        align: center middle;
+    }
+
+    #primary-modal {
+        width: 78;
+        height: 13;
+        padding: 1 2;
+        border: thick $primary;
+        background: $surface;
+    }
+
+    #primary-modal-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+
+    #primary-modal-context {
+        margin-bottom: 1;
+    }
+
+    #primary-modal-error {
+        color: $error;
+        height: 1;
+    }
+
+    #primary-modal-buttons {
+        height: 3;
+        margin-top: 1;
+    }
+
     #top {
-        height: 9;
+        height: 7;
         padding: 1 2;
         border: solid $primary;
     }
@@ -62,6 +155,7 @@ class BranchRebaserApp(App):
         ("space", "toggle_branch", "Toggle"),
         ("a", "select_recommended", "Recommended"),
         ("c", "clear_selection", "Clear"),
+        ("m", "open_menu", "Menu"),
     ]
 
     def __init__(self, repo_path: Path):
@@ -73,14 +167,13 @@ class BranchRebaserApp(App):
         self.branch_order: List[str] = []
         self.branch_by_name: Dict[str, BranchInfo] = {}
         self.running = False
-        self._configuring_primary = False
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="top"):
             yield Static("Loading repository...", id="status")
-            yield Select([], prompt="Primary branch", id="primary-select")
             with Horizontal():
+                yield Button("Primary menu", id="menu", variant="default")
                 yield Button("Refresh", id="refresh", variant="default")
                 yield Button("Select recommended", id="select-recommended", variant="default")
                 yield Button("Clear", id="clear", variant="default")
@@ -96,19 +189,13 @@ class BranchRebaserApp(App):
         table.zebra_stripes = True
         table.add_columns("Sel", "Branch", "Behind", "Ahead", "Upstream", "Status", "Last commit")
         self.refresh_analysis()
-
-    def on_select_changed(self, event: Select.Changed) -> None:
-        if event.select.id != "primary-select" or self.running or self._configuring_primary:
-            return
-        if event.value and event.value != Select.BLANK:
-            if str(event.value) == self.primary:
-                return
-            self.primary = str(event.value)
-            self.refresh_analysis()
+        self.call_after_refresh(self.open_primary_picker, True)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id
-        if button_id == "refresh":
+        if button_id == "menu":
+            self.action_open_menu()
+        elif button_id == "refresh":
             self.action_refresh()
         elif button_id == "select-recommended":
             self.action_select_recommended()
@@ -120,6 +207,9 @@ class BranchRebaserApp(App):
     def action_refresh(self) -> None:
         if not self.running:
             self.refresh_analysis()
+
+    def action_open_menu(self) -> None:
+        self.open_primary_picker(False)
 
     def action_toggle_branch(self) -> None:
         if self.running:
@@ -207,7 +297,6 @@ class BranchRebaserApp(App):
         self.branch_by_name = {branch.name: branch for branch in analysis.branches}
         self.branch_order = [branch.name for branch in analysis.branches]
 
-        self.configure_primary_select(analysis)
         if previous_primary != analysis.primary:
             self.selected.clear()
         self.selected = {
@@ -228,15 +317,39 @@ class BranchRebaserApp(App):
         )
         self.write_log(f"Loaded {len(analysis.branches)} local branches from {analysis.repo}.")
 
-    def configure_primary_select(self, analysis: RepositoryAnalysis) -> None:
-        select = self.query_one("#primary-select", Select)
-        options = [(candidate, candidate) for candidate in analysis.primary_candidates]
-        self._configuring_primary = True
-        try:
-            select.set_options(options)
-            select.value = analysis.primary
-        finally:
-            self._configuring_primary = False
+    def open_primary_picker(self, startup: bool = False) -> None:
+        if self.running:
+            return
+        if not self.analysis:
+            self.refresh_analysis()
+        if not self.analysis:
+            return
+
+        modal = PrimaryBranchModal(
+            list(self.analysis.primary_candidates),
+            self.primary or self.analysis.primary,
+            self.analysis.repo,
+            self.analysis.current_branch,
+            startup=startup,
+        )
+        self.push_screen(
+            modal,
+            callback=lambda selected_primary: self.apply_primary_selection(selected_primary, startup),
+        )
+
+    def apply_primary_selection(self, selected_primary: Optional[str], startup: bool = False) -> None:
+        if selected_primary is None:
+            if startup:
+                self.exit()
+            return
+        if selected_primary == self.primary:
+            if startup:
+                self.write_log(f"Primary branch confirmed: {selected_primary}.")
+            return
+        self.primary = selected_primary
+        self.selected.clear()
+        self.refresh_analysis()
+        self.write_log(f"Primary branch set to {selected_primary}.")
 
     def render_branches(self) -> None:
         table = self.query_one("#branch-table", DataTable)
@@ -306,5 +419,5 @@ class BranchRebaserApp(App):
         self.query_one("#status", Static).update(message)
 
     def set_buttons_enabled(self, enabled: bool) -> None:
-        for button_id in ("#refresh", "#select-recommended", "#clear", "#run"):
+        for button_id in ("#menu", "#refresh", "#select-recommended", "#clear", "#run"):
             self.query_one(button_id, Button).disabled = not enabled

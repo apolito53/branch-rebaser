@@ -50,6 +50,7 @@ branch-rebaser --repo /path/to/repo
 ## Controls
 
 - `Space`: toggle the highlighted branch
+- `m`: open the primary branch menu
 - `r`: run rebase for selected branches
 - `f`: refresh branch analysis
 - `a`: select recommended branches
