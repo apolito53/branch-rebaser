@@ -43,4 +43,3 @@ branch-rebaser --repo /path/to/repo
 ## Safety model
 
 This tool is designed for the batch case where conflicts should be skipped, not resolved inline. If a rebase fails with a conflict, the tool runs `git rebase --abort`, records the branch as conflicted, and continues with the next selected branch.
-
