@@ -383,8 +383,6 @@ class BranchRebaserApp(App):
             selected = "[x]" if branch.name in self.selected else "[ ]"
             status = self.status_text(branch)
             branch_name = Text(branch.name)
-            if branch.is_current:
-                branch_name.append(" *", style="bold cyan")
             table.add_row(
                 selected,
                 branch_name,

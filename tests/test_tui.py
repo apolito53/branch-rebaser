@@ -32,6 +32,9 @@ class TuiTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIsInstance(app.screen, PrimaryBranchModal)
                 self.assertEqual(app.primary, "main")
                 self.assertGreaterEqual(app.query_one("#actions").region.height, 3)
+                main_row = app.query_one("#branch-table").get_row("main")
+                self.assertEqual(main_row[0], "[ ]")
+                self.assertEqual(str(main_row[1]), "main")
 
                 await pilot.press("m")
                 await pilot.pause()
