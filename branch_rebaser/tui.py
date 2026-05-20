@@ -8,7 +8,7 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, Footer, Header, RichLog, Select, Static
+from textual.widgets import Button, DataTable, Footer, Header, RichLog, Static
 
 from .git_ops import (
     BranchInfo,
@@ -51,17 +51,26 @@ class PrimaryBranchModal(ModalScreen):
                 f"Repo: {self.repo} | current: {self.current_branch}",
                 id="primary-modal-context",
             )
-            yield Select(
-                [(candidate, candidate) for candidate in self.candidates],
-                prompt="Primary branch",
-                allow_blank=False,
-                value=self.current_primary,
-                id="primary-picker",
-            )
+            yield DataTable(id="primary-picker")
             yield Static("", id="primary-modal-error")
             with Horizontal(id="primary-modal-buttons"):
                 yield Button("Use primary", id="primary-confirm", variant="primary")
                 yield Button(cancel_label, id="primary-cancel", variant="default")
+
+    def on_mount(self) -> None:
+        table = self.query_one("#primary-picker", DataTable)
+        table.cursor_type = "row"
+        table.zebra_stripes = True
+        table.add_columns("Branch", "Role")
+        current_row = 0
+        for index, candidate in enumerate(self.candidates):
+            if candidate == self.current_primary:
+                current_row = index
+            role = "current primary" if candidate == self.current_primary else ""
+            table.add_row(candidate, role, key=candidate)
+        if self.candidates:
+            table.move_cursor(row=current_row, animate=False)
+        table.focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "primary-confirm":
@@ -69,13 +78,19 @@ class PrimaryBranchModal(ModalScreen):
         elif event.button.id == "primary-cancel":
             self.action_cancel()
 
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        if event.data_table.id != "primary-picker":
+            return
+        event.stop()
+        self.dismiss(str(event.row_key.value))
+
     def action_confirm(self) -> None:
-        select = self.query_one("#primary-picker", Select)
-        value = select.value
-        if value == Select.BLANK:
+        table = self.query_one("#primary-picker", DataTable)
+        row = table.cursor_row
+        if row is None or row < 0 or row >= len(self.candidates):
             self.query_one("#primary-modal-error", Static).update("Pick a primary branch.")
             return
-        self.dismiss(str(value))
+        self.dismiss(self.candidates[row])
 
     def action_cancel(self) -> None:
         self.dismiss(None)
@@ -93,7 +108,7 @@ class BranchRebaserApp(App):
 
     #primary-modal {
         width: 78;
-        height: 13;
+        height: 18;
         padding: 1 2;
         border: thick $primary;
         background: $surface;
@@ -111,6 +126,10 @@ class BranchRebaserApp(App):
     #primary-modal-error {
         color: $error;
         height: 1;
+    }
+
+    #primary-picker {
+        height: 1fr;
     }
 
     #primary-modal-buttons {

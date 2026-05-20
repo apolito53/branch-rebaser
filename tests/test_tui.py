@@ -27,7 +27,7 @@ class TuiTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PrimaryBranchModal)
 
-                app.screen.action_confirm()
+                await pilot.press("enter")
                 await pilot.pause()
                 self.assertNotIsInstance(app.screen, PrimaryBranchModal)
                 self.assertEqual(app.primary, "main")
